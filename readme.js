@@ -4,6 +4,14 @@
 
 const args = process.argv.slice(2);
 
+if (args.includes('--help')) {
+  console.log('Usage: node readme.js [--json] [--help]');
+  console.log('  (no args)  Domain overview and quick start');
+  console.log('  --json     Structured repo data');
+  console.log('  --help     This message');
+  process.exit(0);
+}
+
 if (args.includes('--json')) {
   console.log(JSON.stringify({
     repo: 'nottingham',
