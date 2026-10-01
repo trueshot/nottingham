@@ -1,17 +1,10 @@
 # Nottingham Tools
 
-## readme.js
+| Tool | Purpose |
+|------|---------|
+| `node readme.js [--facets\|--facet-*]` | Domain overview + facets |
+| `node service/server.js` | Standalone notes service on :3520 (dev; NOTES_DEV=1) |
+| `node service/test.js` | End-to-end test, 29 checks, throwaway data dir |
+| `node tools/import-dbf.js --dataset X --dir <dbfdir> [--dry-run] [--out f.json]` | Legacy DBF -> notes service (NOTES_TOKEN env) |
 
-**Purpose:** Repo interface — describes the list/notes system and how to inspect it.
-
-**Location:** `c:/clients/nottingham/readme.js`
-
-**Usage:**
-```bash
-node c:/clients/nottingham/readme.js          # Domain overview
-node c:/clients/nottingham/readme.js --json   # Structured data
-```
-
----
-
-No other tools yet. Note inspection currently uses desoto's DBF tools directly.
+Production: `monkey/reggi-notes.js` mounted at /notes inside Reggi (Monkey:3005).
