@@ -337,7 +337,8 @@ function importBatch(dataset, batch, actor) {
 function status() {
   open();
   const st = { ok: !loadError, error: loadError || undefined, dataDir: DATA, dbPath: DB_PATH };
-  if (db) st.counts = db.prepare(`SELECT (SELECT COUNT(*) FROM notes) AS notes, (SELECT COUNT(*) FROM lists) AS lists`).get();
+  // Cheap on every call (prosser 2026-10-01): MAX(id) is an index seek, not a scan.
+  if (db) st.counts = db.prepare(`SELECT (SELECT MAX(id) FROM notes) AS max_note_id, (SELECT COUNT(*) FROM lists) AS lists`).get();
   return st;
 }
 

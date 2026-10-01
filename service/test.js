@@ -56,7 +56,7 @@ function stop(child) { return new Promise(r => { child.on('exit', r); child.kill
 
   console.log('health + auth gates');
   let r = await api('GET', '/health');
-  check(r.status === 200 && r.body.ok === true, 'health 200 ok', r.body);
+  check(r.status === 200 && r.body.ok === true && 'max_note_id' in r.body.counts, 'health 200 ok', r.body);
   r = await api('GET', '/api/lists');
   check(r.status === 401, 'no identity -> 401', r.status);
   r = await api('GET', '/api/lists', null, { 'X-Notes-Dev-User': 'will' });
