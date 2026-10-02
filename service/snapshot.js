@@ -125,6 +125,13 @@ async function tick() {
         stats.failed++;
         stats.lastError = `${row.dataset} ${row.load_no}: ${e.message}`;
         stats.lastErrorAt = new Date().toISOString();
+        // An old load whose folder is gone (archived) will never succeed: give up after
+        // a few tries instead of retrying every 10 minutes forever.
+        if (/^no load folder/.test(e.message) && row.attempts >= 4) {
+          stats.noFolder = (stats.noFolder || 0) + 1;
+          db.prepare(`DELETE FROM snapshot_queue WHERE dataset = ? AND load_no = ? AND queued_at = ?`).run(row.dataset, row.load_no, row.queued_at);
+          continue;
+        }
         const wait = Math.min(MAX_BACKOFF_MS, 15000 * Math.pow(2, row.attempts));
         db.prepare(`UPDATE snapshot_queue SET attempts = attempts + 1, last_error = ?, next_at = ? WHERE dataset = ? AND load_no = ? AND queued_at = ?`)
           .run(String(e.message).slice(0, 300), new Date(Date.now() + wait).toISOString(), row.dataset, row.load_no, row.queued_at);
