@@ -58,6 +58,9 @@ function ntgEnsureNotesCss() {
       '.ntgn-dialog textarea:focus,.ntgn-dialog select:focus{outline:2px solid #c5d8fb;border-color:#1a73e8;}' +
       '.ntgn-dfoot{display:flex;align-items:center;gap:8px;margin-top:12px;}' +
       '.ntgn-hint{font-size:11px;color:#9aa0a6;}' +
+      '.ntgn-del{color:#c5221f;border-color:#f3c2bf;}' +
+      '.ntgn-del:hover{background:#fdecea;}' +
+      '.ntgn-del.ntgn-armed{background:#c5221f;border-color:#c5221f;color:#fff;}' +
       '.ntgn-err{color:#c5221f;font-size:12px;margin-right:auto;}'
    document.head.appendChild(s)
 }
@@ -245,7 +248,9 @@ function ntgModalOpen(noteId) {
       '</span><span class="ntgn-dload">Load ' + ntgEsc(load) + '</span>' +
       '<button type="button" class="ntgn-x" title="Close (Esc)" onclick="ntgModalClose()">&times;</button></div>' +
       '<textarea id="ntgn-ta" maxlength="20000" placeholder="Type the note…"></textarea>' +
-      '<div class="ntgn-dfoot"><span class="ntgn-err" id="ntgn-err"></span>' +
+      '<div class="ntgn-dfoot">' +
+      (ed.id == null ? '' : '<button type="button" class="ntgn-btn ntgn-del" id="ntgn-del" onclick="ntgDelete()">Delete</button>') +
+      '<span class="ntgn-err" id="ntgn-err"></span>' +
       '<span class="ntgn-hint">Ctrl+Enter to save</span>' +
       '<button type="button" class="ntgn-btn" id="ntgn-cancel" onclick="ntgModalClose()">Cancel</button>' +
       '<button type="button" class="ntgn-btn ntgn-primary" id="ntgn-save" onclick="ntgSave()">Save</button></div>' +
@@ -279,6 +284,40 @@ function ntgModalBusy(busy) {
       s.textContent = busy ? 'Saving…' : 'Save'
    }
    if (c) c.disabled = busy
+   var d = document.getElementById('ntgn-del')
+   if (d) d.disabled = busy
+}
+// Delete = soft delete (restorable; waco's audit trail records it). Two clicks,
+// no browser confirm(): the first arms the button, the second deletes.
+function ntgDelete() {
+   var ed = _app.ntgEdit
+   var btn = document.getElementById('ntgn-del')
+   if (!ed || ed.saving || ed.id == null || !btn) return
+   if (!ed.armDelete) {
+      ed.armDelete = true
+      btn.textContent = 'Click again to delete'
+      btn.className = 'ntgn-btn ntgn-del ntgn-armed'
+      return
+   }
+   ed.saving = true
+   ntgModalError('')
+   ntgModalBusy(true)
+   btn.textContent = 'Deleting…'
+   ntgApi('DELETE', '/notes/' + ed.id)
+      .then(function () {
+         ed.saving = false
+         ntgModalClose()
+         _app.notesOpen = {}
+         if (ed.load === ntgLoadNo()) return ntgRefresh()
+      })
+      .catch(function (e) {
+         ed.saving = false
+         ed.armDelete = false
+         ntgModalBusy(false)
+         btn.textContent = 'Delete'
+         btn.className = 'ntgn-btn ntgn-del'
+         ntgModalError(e.status === 401 ? 'Your session has expired. Sign in again, then retry.' : 'Not deleted: ' + e.message)
+      })
 }
 function ntgSave() {
    var ed = _app.ntgEdit
