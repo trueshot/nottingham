@@ -143,7 +143,7 @@ function event(noteId, actor, kind, body) {
 
 const NOTE_COLS = `n.id, n.dataset, n.load_no, n.list_id, l.short AS list_short, l.name AS list_name,
   l.color AS list_color, n.item_no, n.id_no, n.body, n.deleted, n.created_by, n.created_at,
-  n.updated_by, n.updated_at, n.legacy_idx`;
+  n.updated_by, n.updated_at, n.source, n.legacy_listno, n.legacy_idx`;
 const NOTE_FROM = `FROM notes n LEFT JOIN lists l ON l.dataset = n.dataset AND l.list_id = n.list_id`;
 
 function noteById(dataset, id) {
