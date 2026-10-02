@@ -42,7 +42,16 @@ const dsServer = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify({ shortName: 'willis', server: 'hawk', drive: 'D', directory: '/CLIENTS/WILLIS/' }));
 }).listen(dsPort);
-const snapEnv = { NOTES_BRIDGE: bridge, NOTES_DATASETS_URL: 'http://localhost:' + dsPort + '/datasets/' };
+// Fake waco ring.js: records each bell as a file <ringDir>/<dataset>.note.<load>
+const ringDir = path.join(dataDir, 'rings');
+fs.mkdirSync(ringDir);
+const ringModule = path.join(dataDir, 'fake-ring.js');
+fs.writeFileSync(ringModule, `module.exports.ring = async (ds, domain, load) => {
+  require('fs').writeFileSync(require('path').join(${JSON.stringify(ringDir)}, ds + '.' + domain + '.' + load), '');
+  return { ok: true };
+};`);
+const rang = (ds, load) => fs.existsSync(path.join(ringDir, ds + '.note.' + load));
+const snapEnv = { NOTES_BRIDGE: bridge, NOTES_DATASETS_URL: 'http://localhost:' + dsPort + '/datasets/', NOTES_RING_MODULE: ringModule };
 const readSnap = n => { try { return JSON.parse(fs.readFileSync(path.join(loadDir(n), 'notes.jsn'), 'utf8')); } catch (e) { return null; } };
 const semExists = n => fs.existsSync(path.join(dsDir, 'signals', n + '.sem'));
 async function until(fn, ms) {
@@ -200,6 +209,8 @@ function stop(child) { return new Promise(r => { child.on('exit', r); child.kill
   ok = await until(() => readSnap(60009));
   check(ok && readSnap(60009).notes[0].body === 'old dbf note', 'backfill writes notes.jsn', readSnap(60009));
   check(!semExists(60009), 'backfill drops NO sem', semExists(60009));
+  check(rang('willis', 60000) && rang('willis', 60001), 'audit doorbell rung for real note changes', fs.readdirSync(ringDir));
+  check(!rang('willis', 60009), 'NO audit doorbell for import/backfill', fs.readdirSync(ringDir));
   r = await api('GET', '/health');
   check(r.body.snapshots && r.body.snapshots.written >= 3 && r.body.snapshots.failed === 0, 'health: snapshot stats, no failures', r.body.snapshots);
 

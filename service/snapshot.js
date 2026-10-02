@@ -122,7 +122,25 @@ async function writeOne(row) {
     // file BEFORE sem, always (salem): a render triggered by the sem must see the new snapshot
     await fs.promises.writeFile(path.win32.join(base, 'signals', row.load_no + '.sem'), '');
     stats.sems++;
+    // waco's audit doorbell (George board #108, 2026-10-02): note.<load>.sem, rung only
+    // for real note changes (sem=1), never for import/backfill. Rung here, off the
+    // request path and from the durable queue: a failed ring retries the row.
+    const rung = await ringNote(row.dataset, row.load_no);
+    if (rung && !rung.ok) throw new Error('audit ring: ' + rung.error);
   }
+}
+
+const RING_MODULE = process.env.NOTES_RING_MODULE || 'd:/clients/waco/lib/ring.js';
+let ringFn;   // undefined = not loaded yet, null = unavailable (logged once)
+async function ringNote(dataset, loadNo) {
+  if (ringFn === undefined) {
+    try { ringFn = require(RING_MODULE).ring; }
+    catch (e) { ringFn = null; console.warn('[notes] audit ring unavailable (' + RING_MODULE + '): ' + e.message); }
+  }
+  if (!ringFn) return null;
+  const r = await ringFn(dataset.toLowerCase(), 'note', loadNo);
+  if (r && r.ok) stats.rings = (stats.rings || 0) + 1;
+  return r;
 }
 
 async function tick() {
