@@ -1,11 +1,12 @@
 // --- Load notes: chips + Add / Edit, backed by the /notes service ---------
 // nottingham gen-1 — billet nottinghamListNotes. Owns #theListDiv render.
 // Source of truth for this block: c:/clients/nottingham/ui/notes-strip.js
-// (pasted into trues.js between the NTG markers; eustis deploys).
+// (pasted into willdev/javascripts/trues.js between these markers; deploy: gitgeorg push.js willdev).
 //
 // Data: /notes/api (Reggi on Monkey via oakley's edge; the session cookie
 // carries identity + dataset). Chips: click to open; an open note has Edit.
-// "+ Note" (createListNote) and Edit open one modal. createnote.prg is retired.
+// "+ Note" (createListNote) and Edit open one modal: just the text, no list picker
+// (George 2026-10-02: lists were a hack; labels come later). createnote.prg is retired.
 // If /notes cannot be reached, the strip shows the legacy DBF notes read-only.
 var NTG_PALETTE = [
    '#d32f2f', '#1976d2', '#2e7d32', '#ef6c00',
@@ -177,10 +178,10 @@ function ntgNotesData() {
       return {
          id: n.id,
          list_id: n.list_id,
-         short: n.list_short || '(list)',
+         short: n.list_short || '',
          name: n.list_name || '',
          full: n.body || '',
-         accent: ntgAccent(n.list_id),
+         accent: n.list_id ? ntgAccent(n.list_id) : '#5f6368',
          updated_at: n.updated_at,
          updated_by: n.updated_by,
       }
@@ -204,8 +205,7 @@ function ntgModalOpen(noteId) {
    if (document.getElementById('ntgn-modal')) return
    var load = ntgLoadNo()
    if (!load) return
-   var lists = (_app.ntg && _app.ntg.lists) || []
-   var ed = { id: noteId == null ? null : noteId, load: load, list_id: null, body: '', stamp: null, saving: false }
+   var ed = { id: noteId == null ? null : noteId, load: load, body: '', stamp: null, saving: false }
    if (ed.id == null) {
       ed.key = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
    } else {
@@ -213,20 +213,10 @@ function ntgModalOpen(noteId) {
          return x.id === ed.id
       })[0]
       if (!n) return
-      ed.list_id = n.list_id
       ed.body = n.body || ''
       ed.stamp = n.updated_at
    }
    _app.ntgEdit = ed
-   var opts = lists
-      .filter(function (l) {
-         return l.active || l.list_id === ed.list_id
-      })
-      .map(function (l) {
-         return '<option value="' + l.list_id + '"' + (l.list_id === ed.list_id ? ' selected' : '') + '>' +
-            ntgEsc(l.short + (l.name && l.name !== l.short ? ' — ' + l.name : '')) + '</option>'
-      })
-      .join('')
    var m = document.createElement('div')
    m.id = 'ntgn-modal'
    m.className = 'ntgn-overlay'
@@ -235,9 +225,6 @@ function ntgModalOpen(noteId) {
       '<div class="ntgn-dhead"><span id="ntgn-title">' + (ed.id == null ? 'Add note' : 'Edit note') +
       '</span><span class="ntgn-dload">Load ' + ntgEsc(load) + '</span>' +
       '<button type="button" class="ntgn-x" title="Close (Esc)" onclick="ntgModalClose()">&times;</button></div>' +
-      '<label class="ntgn-lbl" for="ntgn-list">List</label>' +
-      '<select id="ntgn-list">' + (ed.id == null ? '<option value="">Choose a list…</option>' : '') + opts + '</select>' +
-      '<label class="ntgn-lbl" for="ntgn-ta">Note</label>' +
       '<textarea id="ntgn-ta" maxlength="20000" placeholder="Type the note…"></textarea>' +
       '<div class="ntgn-dfoot"><span class="ntgn-err" id="ntgn-err"></span>' +
       '<span class="ntgn-hint">Ctrl+Enter to save</span>' +
@@ -251,11 +238,8 @@ function ntgModalOpen(noteId) {
       if (e.key === 'Escape') ntgModalClose()
       else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') ntgSave()
    })
-   if (ed.id == null) document.getElementById('ntgn-list').focus()
-   else {
-      ta.focus()
-      ta.setSelectionRange(ta.value.length, ta.value.length)
-   }
+   ta.focus()
+   ta.setSelectionRange(ta.value.length, ta.value.length)
 }
 function ntgModalClose() {
    var ed = _app.ntgEdit
@@ -281,16 +265,14 @@ function ntgSave() {
    var ed = _app.ntgEdit
    if (!ed || ed.saving) return
    var body = document.getElementById('ntgn-ta').value
-   var listId = Number(document.getElementById('ntgn-list').value)
-   if (!listId) return ntgModalError('Choose a list.')
    if (!body.trim()) return ntgModalError('The note is empty.')
    ed.saving = true
    ntgModalError('')
    ntgModalBusy(true)
    var p =
       ed.id == null
-         ? ntgApi('POST', '/loads/' + encodeURIComponent(ed.load) + '/notes', { list_id: listId, body: body, client_key: ed.key })
-         : ntgApi('PUT', '/notes/' + ed.id, { list_id: listId, body: body, expect_updated_at: ed.stamp })
+         ? ntgApi('POST', '/loads/' + encodeURIComponent(ed.load) + '/notes', { body: body, client_key: ed.key })
+         : ntgApi('PUT', '/notes/' + ed.id, { body: body, expect_updated_at: ed.stamp })
    p.then(function (r) {
       ed.saving = false
       ntgModalClose()
@@ -350,15 +332,16 @@ function renderNoteList() {
       var snipHtml = ntgEsc(plain.slice(0, 24)) + (plain.length > 24 ? '&#8230;' : '')
       h.push(
          '<span class="ntgn-chip' + (on ? ' ntgn-on' : '') + '" onclick="ntgToggleNote(' + i + ')" title="' +
-            ntgEsc(x.short + ': ' + plain) + '"><span class="ntgn-dot" style="background:' + x.accent +
-            '"></span><span class="ntgn-tag" style="color:' + x.accent + '">' + ntgEsc(x.short) + '</span>' +
-            (on ? '' : '<span class="ntgn-snip">' + snipHtml + '</span>') + '</span>',
+            ntgEsc((x.short ? x.short + ': ' : '') + plain) + '"><span class="ntgn-dot" style="background:' + x.accent + '"></span>' +
+            // legacy notes keep their list label; new notes have none (George 2026-10-02) -> text only
+            (x.short ? '<span class="ntgn-tag" style="color:' + x.accent + '">' + ntgEsc(x.short) + '</span>' : '') +
+            (on && x.short ? '' : '<span class="ntgn-snip">' + snipHtml + '</span>') + '</span>',
       )
       if (on) {
          var meta = x.updated_by ? x.updated_by.replace(/^import:.*/, 'imported') + (x.updated_at ? ', ' + ntgWhen(x.updated_at) : '') : ''
          h.push(
             '<span class="ntgn-panel" style="border-left-color:' + x.accent + '"><span class="ntgn-ph" style="color:' +
-               x.accent + '">' + ntgEsc(x.short) + (x.name && x.name !== x.short ? ' &mdash; ' + ntgEsc(x.name) : '') +
+               x.accent + '">' + (x.short ? ntgEsc(x.short) + (x.name && x.name !== x.short ? ' &mdash; ' + ntgEsc(x.name) : '') : 'Note') +
                (meta ? '<span class="ntgn-meta">' + ntgEsc(meta) + '</span>' : '') +
                (x.id != null ? '<button type="button" class="ntgn-btn" onclick="event.stopPropagation();ntgEdit(' + x.id + ')">Edit</button>' : '') +
                '</span>' + (x.full ? ntgEsc(x.full) : '<span class="ntgn-empty">(no text)</span>') + '</span>',
@@ -369,28 +352,10 @@ function renderNoteList() {
    div.innerHTML = h.join('')
 }
 // "+ Note" in the load header (salesgrid.js) and the Edit button call these.
-// Lists are fetched first if the strip has not loaded them yet.
-function ntgWithLists(fn) {
-   if (_app.ntg && _app.ntg.lists && _app.ntg.lists.length) return fn()
-   ntgApi('GET', '/lists')
-      .then(function (r) {
-         _app.ntg = _app.ntg || { load: ntgLoadNo(), live: false, ready: false, notes: [] }
-         _app.ntg.lists = r.lists || []
-         fn()
-      })
-      .catch(function (e) {
-         console.warn('[notes] cannot load lists: ' + e.message)
-         fn()
-      })
-}
 function ntgEdit(noteId) {
-   ntgWithLists(function () {
-      ntgModalOpen(noteId)
-   })
+   ntgModalOpen(noteId)
 }
 var createListNote = function () {
-   ntgWithLists(function () {
-      ntgModalOpen(null)
-   })
+   ntgModalOpen(null)
 }
 // --- end load notes ---------------------------------------------------------

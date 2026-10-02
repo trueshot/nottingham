@@ -74,6 +74,21 @@ async function datasetDir(dataset) {
   return dir;
 }
 
+// Does the load's folder exist on the prey? true / false / null (couldn't tell —
+// dataset lookup or share unreachable; callers then fail OPEN so a user's note is
+// never lost to an infrastructure blip). Used to refuse notes on loads that don't exist.
+async function loadExists(dataset, loadNo) {
+  if (!ENABLED) return null;
+  let base;
+  try { base = await datasetDir(dataset); } catch (e) { return null; }
+  try {
+    await fs.promises.access(path.win32.join(base, 'loads', String(loadNo).slice(-1), String(loadNo)));
+    return true;
+  } catch (e) {
+    return e.code === 'ENOENT' ? false : null;
+  }
+}
+
 function snapshotRows(dataset, loadNo) {
   return db.prepare(`
     SELECT n.id, n.list_id, l.short AS list_short, l.name AS list_name, l.color AS list_color,
@@ -164,4 +179,4 @@ function status() {
   return out;
 }
 
-module.exports = { attach, detach, enqueue, status, tick, datasetDir };
+module.exports = { attach, detach, enqueue, status, tick, datasetDir, loadExists };

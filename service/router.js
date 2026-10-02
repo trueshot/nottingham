@@ -12,7 +12,7 @@
 //   GET    /api/lists                       -> the dataset's lists (TAGPROB, 2020, ...)
 //   PUT    /api/lists/:listId               {name, short, descr, color, active}
 //   GET    /api/loads/:load/notes           -> notes on one load (the chip strip)
-//   POST   /api/loads/:load/notes           {list_id, body, item_no?, id_no?, client_key?}
+//   POST   /api/loads/:load/notes           {body, client_key?, list_id?, item_no?, id_no?}  404 if no load folder
 //   GET    /api/notes?list_id&q&load_no&since&before_id&limit   (paged, max 200)
 //   GET    /api/notes/:id
 //   PUT    /api/notes/:id                   {body?, list_id?, expect_updated_at?}
@@ -25,6 +25,7 @@ const { hostRequire } = require('./deps');
 const express = hostRequire('express');
 const db = require('./db');
 const auth = require('./auth');
+const snapshot = require('./snapshot');
 
 const router = express.Router();
 
@@ -72,7 +73,11 @@ router.put('/api/lists/:listId', safe((req, res) => {
 router.get('/api/loads/:load/notes', safe((req, res) => {
   res.json(db.notesForLoad(req.notes.dataset, req.params.load, { includeDeleted: req.query.deleted === '1' }));
 }));
-router.post('/api/loads/:load/notes', safe((req, res) => {
+router.post('/api/loads/:load/notes', safe(async (req, res) => {
+  // Refuse notes on loads that don't exist on the prey (no folder). Unknown = allow.
+  if (/^[A-Za-z0-9_-]{1,20}$/.test(req.params.load) && (await snapshot.loadExists(req.notes.dataset, req.params.load)) === false) {
+    return res.status(404).json({ error: 'no such load: ' + req.params.load });
+  }
   const r = db.addNote(req.notes.dataset, req.params.load, req.body || {}, auth.actor(req));
   res.status(r.replayed ? 200 : 201).json(r);
 }));

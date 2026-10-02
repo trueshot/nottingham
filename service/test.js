@@ -36,7 +36,7 @@ const bridge = path.join(dataDir, 'bridge');
 const dsDir = path.join(bridge, 'hawk', 'd', 'CLIENTS', 'WILLIS');
 const loadDir = n => path.join(dsDir, 'loads', String(n).slice(-1), String(n));
 fs.mkdirSync(path.join(dsDir, 'signals'), { recursive: true });
-for (const n of [60000, 60001, 60009]) fs.mkdirSync(loadDir(n), { recursive: true });
+for (const n of [1, 60000, 60001, 60002, 60003, 60004, 60005, 60006, 60007, 60008, 60009]) fs.mkdirSync(loadDir(n), { recursive: true });
 const dsPort = port + 1;
 const dsServer = http.createServer((req, res) => {
   res.setHeader('Content-Type', 'application/json');
@@ -72,8 +72,32 @@ async function waitUp(child) {
 function stop(child) { return new Promise(r => { child.on('exit', r); child.kill(); }); }
 
 (async () => {
+  // Seed a DB with the ORIGINAL schema (list_id NOT NULL) to prove the one-time rebuild.
+  {
+    const Database = require('./deps').hostRequire('better-sqlite3');
+    const old = new Database(path.join(dataDir, 'notes.db'));
+    old.exec(`
+      CREATE TABLE lists (dataset TEXT NOT NULL, list_id INTEGER NOT NULL, name TEXT NOT NULL DEFAULT '', short TEXT NOT NULL DEFAULT '',
+        descr TEXT NOT NULL DEFAULT '', color TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL, PRIMARY KEY (dataset, list_id));
+      CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, dataset TEXT NOT NULL, load_no TEXT NOT NULL, list_id INTEGER NOT NULL,
+        item_no TEXT NOT NULL DEFAULT '', id_no TEXT NOT NULL DEFAULT '', body TEXT NOT NULL DEFAULT '', deleted INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'app', client_key TEXT, legacy_listno INTEGER, legacy_idx INTEGER, created_by TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL, updated_by TEXT NOT NULL DEFAULT '', updated_at TEXT NOT NULL,
+        FOREIGN KEY (dataset, list_id) REFERENCES lists (dataset, list_id));
+      INSERT INTO lists VALUES ('OLDDS', 7, 'Old', 'OLD', '', '', 1, 'x', 'x');
+      INSERT INTO notes (id, dataset, load_no, list_id, body, created_at, updated_at) VALUES (900, 'OLDDS', '1', 7, 'pre-migration', 'x', 'x');
+    `);
+    old.close();
+  }
   let child = startServer();
   await waitUp(child);
+
+  console.log('schema migration: list_id NOT NULL -> nullable');
+  let mr = await api('GET', '/api/notes/900', null, { 'X-Notes-Dev-User': 'will', 'X-Notes-Dataset': 'OLDDS' });
+  check(mr.status === 200 && mr.body.note.body === 'pre-migration' && mr.body.note.list_short === 'OLD', 'old row survives the rebuild with its list', mr.body);
+  mr = await api('POST', '/api/loads/1/notes', { body: 'after migration' }, { 'X-Notes-Dev-User': 'will', 'X-Notes-Dataset': 'OLDDS' });
+  check(mr.status === 201 && mr.body.note.id > 900, 'new ids continue after the old max (AUTOINCREMENT kept)', mr.body);
 
   console.log('health + auth gates');
   let r = await api('GET', '/health');
@@ -109,6 +133,10 @@ function stop(child) { return new Promise(r => { child.on('exit', r); child.kill
   check(r.status === 200 && r.body.replayed === true && r.body.note.id === id, 'retry with same client_key returns same note', r.body);
   r = await api('POST', '/api/loads/60000/notes', { list_id: 9999, body: 'x' }, W);
   check(r.status === 400, 'unknown list -> 400', r.body);
+  r = await api('POST', '/api/loads/60008/notes', { body: 'no list at all' }, W);
+  check(r.status === 201 && r.body.note.list_id === null && r.body.note.list_short === null, 'note without a list -> 201, list null', r.body);
+  r = await api('POST', '/api/loads/69999/notes', { body: 'ghost load' }, W);
+  check(r.status === 404 && /no such load/.test(r.body.error), 'load with no folder -> 404', r.body);
   r = await api('POST', '/api/loads/60000/notes', { list_id: 1003, body: 'x'.repeat(20001) }, W);
   check(r.status === 400, 'oversize body -> 400', r.status);
   r = await api('POST', '/api/loads/..%2F..%2Fx/notes', { list_id: 1003, body: 'x' }, W);
@@ -173,7 +201,7 @@ function stop(child) { return new Promise(r => { child.on('exit', r); child.kill
   check(ok && readSnap(60009).notes[0].body === 'old dbf note', 'backfill writes notes.jsn', readSnap(60009));
   check(!semExists(60009), 'backfill drops NO sem', semExists(60009));
   r = await api('GET', '/health');
-  check(r.body.snapshots && r.body.snapshots.written >= 3 && r.body.snapshots.retrying >= 1, 'health: snapshot stats, missing load folders retrying', r.body.snapshots);
+  check(r.body.snapshots && r.body.snapshots.written >= 3 && r.body.snapshots.failed === 0, 'health: snapshot stats, no failures', r.body.snapshots);
 
   console.log('restart survival');
   await stop(child);

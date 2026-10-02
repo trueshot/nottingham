@@ -71,7 +71,7 @@ function migrate() {
       id            INTEGER PRIMARY KEY AUTOINCREMENT,
       dataset       TEXT NOT NULL,
       load_no       TEXT NOT NULL,          -- legacy INVCE_NO
-      list_id       INTEGER NOT NULL,
+      list_id       INTEGER,                -- NULL = no list (George 2026-10-02)
       item_no       TEXT NOT NULL DEFAULT '',
       id_no         TEXT NOT NULL DEFAULT '',
       body          TEXT NOT NULL DEFAULT '',
@@ -100,6 +100,55 @@ function migrate() {
     );
     CREATE INDEX IF NOT EXISTS idx_events_note ON note_events (note_id);
   `);
+  relaxListId();
+}
+
+// George 2026-10-02: no "which list" for new notes — lists were a legacy hack;
+// labels come later. notes.list_id becomes NULLable. SQLite can't drop NOT NULL
+// in place, so rebuild the table once (same columns, same ids), in a transaction.
+function relaxListId() {
+  const col = db.prepare(`SELECT "notnull" AS nn FROM pragma_table_info('notes') WHERE name = 'list_id'`).get();
+  if (!col || !col.nn) return;
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE notes_new (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          dataset       TEXT NOT NULL,
+          load_no       TEXT NOT NULL,
+          list_id       INTEGER,                -- NULL = no list (all new notes)
+          item_no       TEXT NOT NULL DEFAULT '',
+          id_no         TEXT NOT NULL DEFAULT '',
+          body          TEXT NOT NULL DEFAULT '',
+          deleted       INTEGER NOT NULL DEFAULT 0,
+          source        TEXT NOT NULL DEFAULT 'app',
+          client_key    TEXT,
+          legacy_listno INTEGER,
+          legacy_idx    INTEGER,
+          created_by    TEXT NOT NULL DEFAULT '',
+          created_at    TEXT NOT NULL,
+          updated_by    TEXT NOT NULL DEFAULT '',
+          updated_at    TEXT NOT NULL,
+          FOREIGN KEY (dataset, list_id) REFERENCES lists (dataset, list_id)
+        );
+        INSERT INTO notes_new (id, dataset, load_no, list_id, item_no, id_no, body, deleted, source, client_key,
+                               legacy_listno, legacy_idx, created_by, created_at, updated_by, updated_at)
+          SELECT id, dataset, load_no, list_id, item_no, id_no, body, deleted, source, client_key,
+                 legacy_listno, legacy_idx, created_by, created_at, updated_by, updated_at FROM notes;
+        DROP TABLE notes;
+        ALTER TABLE notes_new RENAME TO notes;
+        CREATE INDEX IF NOT EXISTS idx_notes_load ON notes (dataset, load_no);
+        CREATE INDEX IF NOT EXISTS idx_notes_list ON notes (dataset, list_id, id);
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_notes_client ON notes (dataset, client_key) WHERE client_key IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_notes_legacy ON notes (dataset, legacy_listno, legacy_idx) WHERE legacy_idx IS NOT NULL;
+      `);
+      const bad = db.pragma('foreign_key_check');
+      if (bad.length) throw new Error('foreign_key_check failed after list_id rebuild: ' + JSON.stringify(bad.slice(0, 3)));
+    })();
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
 }
 
 function close() {
@@ -187,6 +236,12 @@ function requireList(dataset, listId) {
   if (!row) throw httpError(400, `no list ${n} in dataset ${dataset}`);
   return n;
 }
+// New notes carry no list (George 2026-10-02). A list_id is still accepted and
+// checked if a caller sends one; null / '' / missing = no list.
+function optionalList(dataset, listId) {
+  if (listId === undefined || listId === null || listId === '') return null;
+  return requireList(dataset, listId);
+}
 
 // ---------- notes ----------
 
@@ -236,7 +291,7 @@ function addNote(dataset, load, input, actor) {
       const hit = db.prepare(`SELECT id FROM notes WHERE dataset = ? AND client_key = ?`).get(dataset, clientKey);
       if (hit) return { note: noteById(dataset, hit.id), replayed: true };
     }
-    const listId = requireList(dataset, input.list_id);
+    const listId = optionalList(dataset, input.list_id);
     const body = str(input.body, MAX_BODY, 'body');
     const ts = now();
     const r = db.prepare(`
@@ -260,7 +315,7 @@ function updateNote(dataset, id, input, actor) {
       throw Object.assign(httpError(409, 'note changed since you read it'), { current: noteById(dataset, id) });
     }
     const body = input.body === undefined ? cur.body : str(input.body, MAX_BODY, 'body');
-    const listId = input.list_id === undefined ? cur.list_id : requireList(dataset, input.list_id);
+    const listId = input.list_id === undefined ? cur.list_id : optionalList(dataset, input.list_id);
     if (body === cur.body && listId === cur.list_id) return noteById(dataset, id);   // no-op retry
     db.prepare(`UPDATE notes SET body = ?, list_id = ?, source = 'app', updated_by = ?, updated_at = ? WHERE id = ?`)
       .run(body, listId, actor, now(), id);
