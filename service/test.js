@@ -29,11 +29,32 @@ async function api(method, url, body, headers) {
   return { status: r.status, body: json };
 }
 const W = { 'X-Notes-Dev-User': 'will', 'X-Notes-Dataset': 'WILLIS' };
+
+// Fake prey share for notes.jsn snapshots: <bridge>/hawk/d/CLIENTS/WILLIS/{loads,signals}
+const http = require('http');
+const bridge = path.join(dataDir, 'bridge');
+const dsDir = path.join(bridge, 'hawk', 'd', 'CLIENTS', 'WILLIS');
+const loadDir = n => path.join(dsDir, 'loads', String(n).slice(-1), String(n));
+fs.mkdirSync(path.join(dsDir, 'signals'), { recursive: true });
+for (const n of [60000, 60001, 60009]) fs.mkdirSync(loadDir(n), { recursive: true });
+const dsPort = port + 1;
+const dsServer = http.createServer((req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ shortName: 'willis', server: 'hawk', drive: 'D', directory: '/CLIENTS/WILLIS/' }));
+}).listen(dsPort);
+const snapEnv = { NOTES_BRIDGE: bridge, NOTES_DATASETS_URL: 'http://localhost:' + dsPort + '/datasets/' };
+const readSnap = n => { try { return JSON.parse(fs.readFileSync(path.join(loadDir(n), 'notes.jsn'), 'utf8')); } catch (e) { return null; } };
+const semExists = n => fs.existsSync(path.join(dsDir, 'signals', n + '.sem'));
+async function until(fn, ms) {
+  const end = Date.now() + (ms || 8000);
+  while (Date.now() < end) { if (fn()) return true; await new Promise(r => setTimeout(r, 200)); }
+  return false;
+}
 const OTHER = { 'X-Notes-Dev-User': 'sam', 'X-Notes-Dataset': 'HARTEE' };
 
 function startServer(env) {
   const child = spawn(process.execPath, [path.join(__dirname, 'server.js')], {
-    env: Object.assign({}, process.env, { NOTES_DATA_DIR: dataDir, NOTES_PORT: String(port), NOTES_DEV: '1' }, env || {}),
+    env: Object.assign({}, process.env, { NOTES_DATA_DIR: dataDir, NOTES_PORT: String(port), NOTES_DEV: '1' }, snapEnv, env || {}),
     stdio: ['ignore', 'pipe', 'pipe']
   });
   child.out = '';
@@ -131,6 +152,29 @@ function stop(child) { return new Promise(r => { child.on('exit', r); child.kill
   r = await api('GET', '/api/notes?q=%25', null, W);
   check(r.body.notes.length === 0, 'LIKE wildcard escaped', r.body.notes.length);
 
+  console.log('notes.jsn snapshots on the prey share');
+  let ok = await until(() => semExists(60000) && readSnap(60000));
+  let snap = readSnap(60000);
+  const live60000 = (await api('GET', '/api/loads/60000/notes', null, W)).body.notes.length;
+  check(ok && snap.format === 'nottingham-notes/1' && snap.notes.length === live60000, 'load 60000: notes.jsn matches the API + sem', [snap && snap.notes.length, live60000]);
+  check(snap && snap.notes.every(n => 'source' in n && 'legacy_idx' in n), 'snapshot carries source + legacy key', snap && snap.notes[0]);
+  const bulk1 = (await api('GET', '/api/loads/60001/notes', null, W)).body.notes[0];
+  ok = await until(() => readSnap(60001) && readSnap(60001).notes.length === 1);
+  check(ok, 'load 60001 snapshot has its 1 note', readSnap(60001));
+  await until(() => semExists(60001));
+  fs.unlinkSync(path.join(dsDir, 'signals', '60001.sem'));
+  await api('DELETE', '/api/notes/' + bulk1.id, null, W);
+  ok = await until(() => semExists(60001) && readSnap(60001) && readSnap(60001).notes.length === 0);
+  check(ok, 'last note deleted -> {notes:[]} written (not removed) + sem', readSnap(60001));
+  await api('POST', '/api/import', { notes: [{ legacy_listno: 1005, legacy_idx: 9001, load_no: '60009', body: 'old dbf note' }] }, W);
+  r = await api('POST', '/api/snapshots/backfill', null, W);
+  check(r.status === 200 && r.body.queued >= 1, 'backfill queues loads', r.body);
+  ok = await until(() => readSnap(60009));
+  check(ok && readSnap(60009).notes[0].body === 'old dbf note', 'backfill writes notes.jsn', readSnap(60009));
+  check(!semExists(60009), 'backfill drops NO sem', semExists(60009));
+  r = await api('GET', '/health');
+  check(r.body.snapshots && r.body.snapshots.written >= 3 && r.body.snapshots.retrying >= 1, 'health: snapshot stats, missing load folders retrying', r.body.snapshots);
+
   console.log('restart survival');
   await stop(child);
   child = startServer();
@@ -148,6 +192,7 @@ function stop(child) { return new Promise(r => { child.on('exit', r); child.kill
   check(r.status === 503, 'api 503 when data dir missing', r.status);
   await stop(child);
 
+  dsServer.close();
   console.log(`\n${passes} passed, ${failures} failed`);
   try { fs.rmSync(dataDir, { recursive: true, force: true }); } catch (e) { /* WAL handle on Windows */ }
   process.exit(failures ? 1 : 0);

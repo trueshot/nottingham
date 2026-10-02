@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { hostRequire } = require('./deps');
+const snapshot = require('./snapshot');
 
 const DATA = process.env.NOTES_DATA_DIR || path.resolve(__dirname, '..', 'data');
 const DB_PATH = path.join(DATA, 'notes.db');
@@ -44,6 +45,7 @@ function open() {
     db.pragma('busy_timeout = 5000');
     db.pragma('foreign_keys = ON');
     migrate();
+    snapshot.attach(db);
   } catch (e) {
     loadError = 'SQLite open failed: ' + e.message;
     try { if (db) db.close(); } catch (e2) { /* ignore */ }
@@ -101,6 +103,7 @@ function migrate() {
 }
 
 function close() {
+  snapshot.detach();
   if (db) { try { db.close(); } catch (e) { /* already closed */ } db = null; }
 }
 if (!global.__nottinghamNotesShutdownHooked) {
@@ -242,6 +245,7 @@ function addNote(dataset, load, input, actor) {
     `).run(dataset, loadNo, listId, str(input.item_no, 30, 'item_no'), str(input.id_no, 30, 'id_no'), body, clientKey, actor, ts, actor, ts);
     const id = Number(r.lastInsertRowid);
     event(id, actor, 'create', body);
+    snapshot.enqueue(db, dataset, loadNo, true);
     return { note: noteById(dataset, id), replayed: false };
   });
 }
@@ -261,17 +265,19 @@ function updateNote(dataset, id, input, actor) {
     db.prepare(`UPDATE notes SET body = ?, list_id = ?, source = 'app', updated_by = ?, updated_at = ? WHERE id = ?`)
       .run(body, listId, actor, now(), id);
     event(id, actor, 'edit', body);
+    snapshot.enqueue(db, dataset, cur.load_no, true);
     return noteById(dataset, id);
   });
 }
 
 function setDeleted(dataset, id, deleted, actor) {
   return tx(() => {
-    const cur = db.prepare(`SELECT deleted FROM notes WHERE dataset = ? AND id = ?`).get(dataset, id);
+    const cur = db.prepare(`SELECT deleted, load_no FROM notes WHERE dataset = ? AND id = ?`).get(dataset, id);
     if (!cur) throw httpError(404, 'no such note');
     if (cur.deleted !== deleted) {
       db.prepare(`UPDATE notes SET deleted = ?, source = 'app', updated_by = ?, updated_at = ? WHERE id = ?`).run(deleted, actor, now(), id);
       event(id, actor, deleted ? 'delete' : 'restore', null);
+      snapshot.enqueue(db, dataset, cur.load_no, true);
     }
     return noteById(dataset, id);
   });
@@ -334,10 +340,24 @@ function importBatch(dataset, batch, actor) {
   return out;
 }
 
+// Queue a snapshot (no sem) for every load in the dataset that has notes — the
+// one-time backfill agreed with salem: imported text already matches LISTNOTE, so
+// no re-render is needed; each load picks up notes.jsn on its next render.
+function backfillSnapshots(dataset) {
+  const ts = new Date().toISOString();
+  const r = get().prepare(`
+    INSERT INTO snapshot_queue (dataset, load_no, sem, queued_at, attempts, next_at, last_error)
+    SELECT DISTINCT dataset, load_no, 0, ?, 0, ?, '' FROM notes WHERE dataset = ? AND true
+    ON CONFLICT (dataset, load_no) DO NOTHING
+  `).run(ts, ts, dataset);
+  return { queued: r.changes };
+}
+
 function status() {
   open();
   const st = { ok: !loadError, error: loadError || undefined, dataDir: DATA, dbPath: DB_PATH };
   // Cheap on every call (prosser 2026-10-01): MAX(id) is an index seek, not a scan.
+  if (db) st.snapshots = snapshot.status();
   if (db) st.counts = db.prepare(`SELECT (SELECT MAX(id) FROM notes) AS max_note_id, (SELECT COUNT(*) FROM lists) AS lists`).get();
   return st;
 }
@@ -345,5 +365,5 @@ function status() {
 module.exports = {
   DATA, DB_PATH, MAX_PAGE, MAX_IMPORT,
   open, close, get, status, httpError,
-  listLists, upsertList, notesForLoad, searchNotes, getNote, addNote, updateNote, setDeleted, history, importBatch
+  backfillSnapshots, listLists, upsertList, notesForLoad, searchNotes, getNote, addNote, updateNote, setDeleted, history, importBatch
 };

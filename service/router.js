@@ -18,6 +18,7 @@
 //   PUT    /api/notes/:id                   {body?, list_id?, expect_updated_at?}
 //   DELETE /api/notes/:id                   soft delete;  POST /api/notes/:id/restore
 //   GET    /api/notes/:id/history
+//   POST   /api/snapshots/backfill        queue notes.jsn for every load of the dataset (no sems)
 //   POST   /api/import                      {lists[], notes[]}  (legacy DBF import, max 500/batch)
 
 const { hostRequire } = require('./deps');
@@ -53,7 +54,7 @@ router.use(express.json({ limit: '2mb' }));
 router.get('/health', (req, res) => {
   let st;
   try { st = db.status(); } catch (e) { st = { ok: false, error: e.message }; }
-  res.status(st.ok ? 200 : 503).json({ service: 'nottingham-notes', version: 1, ok: st.ok, error: st.error, dataDir: st.dataDir, counts: st.counts, dev: auth.DEV });
+  res.status(st.ok ? 200 : 503).json({ service: 'nottingham-notes', version: 1, ok: st.ok, error: st.error, dataDir: st.dataDir, counts: st.counts, snapshots: st.snapshots, dev: auth.DEV });
 });
 
 router.get('/api/whoami', safe(async (req, res) => {
@@ -82,6 +83,8 @@ router.put('/api/notes/:id', safe((req, res) => res.json({ note: db.updateNote(r
 router.delete('/api/notes/:id', safe((req, res) => res.json({ note: db.setDeleted(req.notes.dataset, noteId(req), 1, auth.actor(req)) })));
 router.post('/api/notes/:id/restore', safe((req, res) => res.json({ note: db.setDeleted(req.notes.dataset, noteId(req), 0, auth.actor(req)) })));
 router.get('/api/notes/:id/history', safe((req, res) => res.json({ events: db.history(req.notes.dataset, noteId(req)) })));
+
+router.post('/api/snapshots/backfill', safe((req, res) => res.json(db.backfillSnapshots(req.notes.dataset))));
 
 router.post('/api/import', safe((req, res) => res.json(db.importBatch(req.notes.dataset, req.body || {}, 'import:' + auth.actor(req)))));
 
