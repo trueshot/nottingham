@@ -97,26 +97,37 @@ function ntgApi(method, path, body) {
 function ntgLoadNo() {
    return String(_app.theCurrentLoad || '').trim()
 }
-// _app.ntg = {load, live, ready, notes, lists}   _app.ntgEdit = open modal state
-//   live=true  -> notes came from /notes (editable)
-//   live=false -> /notes unreachable; legacy DBF notes, read-only
+// Notes for the current load, as delivered by the normal load call-up
+// (GET /api/v1/loads/<load>/details -> all.jsn, top-level NOTES = that load's
+// notes.jsn, spliced in by i_ldld — palmbeach 2026-10-02). The loader stores it in
+// _app.i_ntgNotes[load]. Shape: {format:'nottingham-notes/1', notes:[...]}.
+function ntgLoadedNotes() {
+   var src = _app.i_ntgNotes && _app.i_ntgNotes[ntgLoadNo()]
+   return src && src.format === 'nottingham-notes/1' && src.notes && src.notes.length !== undefined ? src : null
+}
+// _app.ntg = {load, src, live, ready, notes}   _app.ntgEdit = open modal state
+//   live=true  -> notes from the load data (NOTES) or /notes (editable)
+//   live=false -> neither available; legacy DBF notes (LIST), read-only
 function ntgFetch() {
    var load = ntgLoadNo()
-   var lists = _app.ntg && _app.ntg.lists
-   _app.ntg = { load: load, live: false, ready: false, notes: [], lists: lists, src: _app.theCurrentNoteList }
+   var src = ntgLoadedNotes()
+   _app.ntg = { load: load, src: src, live: false, ready: false, notes: [] }
    _app.notesOpen = {}
    if (!load) return
-   Promise.all([
-      ntgApi('GET', '/loads/' + encodeURIComponent(load) + '/notes'),
-      lists ? { lists: lists } : ntgApi('GET', '/lists'),
-   ])
+   if (src) {
+      // Normal path: the notes came with the load — no extra request.
+      _app.ntg.notes = src.notes
+      _app.ntg.live = true
+      _app.ntg.ready = true
+      return
+   }
+   // No NOTES in the load data (a load with no notes.jsn yet): ask /notes directly.
+   ntgApi('GET', '/loads/' + encodeURIComponent(load) + '/notes')
       .then(function (r) {
          if (!_app.ntg || _app.ntg.load !== load) return // user moved to another load
-         _app.ntg.notes = r[0].notes || []
-         _app.ntg.lists = r[1].lists || []
+         _app.ntg.notes = r.notes || []
          _app.ntg.live = true
          _app.ntg.ready = true
-         _app.ntg.at = Date.now()
          renderNoteList()
       })
       .catch(function (e) {
@@ -126,40 +137,28 @@ function ntgFetch() {
          renderNoteList()
       })
 }
+// Right after a save (here or in the Flow bar) the load data is a few seconds
+// behind, so re-read this load's notes straight from /notes.
 function ntgRefresh() {
    var load = ntgLoadNo()
    return ntgApi('GET', '/loads/' + encodeURIComponent(load) + '/notes').then(function (r) {
       if (_app.ntg && _app.ntg.load === load) {
          _app.ntg.notes = r.notes || []
-         _app.ntg.at = Date.now()
+         _app.ntg.live = true
+         _app.ntg.ready = true
          renderNoteList()
       }
    })
 }
-// Notes can be added from elsewhere on the page (prospect's Flow bar) or by another
-// user. Redraw when told ('notes:changed' event, detail = {load}), when the window
-// regains focus, and once a minute while visible. Quiet: failures are ignored.
-function ntgQuietRefresh() {
-   if (!(_app.ntg && _app.ntg.live && _app.ntg.load === ntgLoadNo()) || _app.ntgEdit) return
-   ntgRefresh().catch(function () {})
-}
+// Another part of the page saved a note (prospect's Flow bar):
+//   document.dispatchEvent(new CustomEvent('notes:changed', {detail: {load: '60000'}}))
 if (!window.__ntgHooked) {
    window.__ntgHooked = true
    document.addEventListener('notes:changed', function (e) {
       var load = e && e.detail && e.detail.load
-      if (!load || String(load).trim() === ntgLoadNo()) ntgQuietRefresh()
+      if (_app.ntgEdit || !(_app.ntg && _app.ntg.load === ntgLoadNo())) return
+      if (!load || String(load).trim() === ntgLoadNo()) ntgRefresh().catch(function () {})
    })
-   window.addEventListener('focus', ntgQuietRefresh)
-   setInterval(function () {
-      if (document.visibilityState === 'visible') ntgQuietRefresh()
-   }, 60000)
-}
-function ntgAccent(listId) {
-   var lists = (_app.ntg && _app.ntg.lists) || []
-   for (var i = 0; i < lists.length; i++) {
-      if (lists[i].list_id === listId) return lists[i].color || NTG_PALETTE[i % NTG_PALETTE.length]
-   }
-   return NTG_PALETTE[0]
 }
 // Legacy: join the head/tail/note DBF tables for the current load.
 function ntgLegacyNotes() {
@@ -201,7 +200,7 @@ function ntgNotesData() {
          short: n.list_short || '',
          name: n.list_name || '',
          full: n.body || '',
-         accent: n.list_id ? ntgAccent(n.list_id) : '#5f6368',
+         accent: n.list_id ? n.list_color || NTG_PALETTE[n.list_id % NTG_PALETTE.length] : '#5f6368',
          updated_at: n.updated_at,
          updated_by: n.updated_by,
       }
@@ -328,12 +327,8 @@ function ntgWhen(iso) {
 function renderNoteList() {
    var div = document.getElementById('theListDiv')
    if (!div) return
-   if (!_app.ntg || _app.ntg.load !== ntgLoadNo()) ntgFetch()
-   else if (_app.ntg.ready && (_app.ntg.src !== _app.theCurrentNoteList || Date.now() - (_app.ntg.at || 0) > 10000)) {
-      // Same load re-retrieved (Refresh) or data older than 10s: fetch notes again, quietly.
-      _app.ntg.src = _app.theCurrentNoteList
-      ntgQuietRefresh()
-   }
+   // (Re)read whenever the load or its retrieved data changes: open, Refresh, call-up.
+   if (!_app.ntg || _app.ntg.load !== ntgLoadNo() || _app.ntg.src !== ntgLoadedNotes()) ntgFetch()
    ntgEnsureNotesCss()
    var notes = ntgNotesData()
    if (!notes.length) {
