@@ -16,7 +16,9 @@ Browser URL: https://<dataset>.produceflow.com/notes/api/...  Monitor: http://15
   GET    /notes/api/lists                      the dataset's lists (1003 TAGPROB, 1005 2020, ...)
   PUT    /notes/api/lists/:listId              {name, short, descr, color, active}
   GET    /notes/api/loads/:load/notes          notes on one load (the chip strip), max 500
-  POST   /notes/api/loads/:load/notes          {list_id, body, item_no?, id_no?, client_key?}
+  POST   /notes/api/loads/:load/notes          {body, client_key?}  -> 201 {note}, 200 replayed; 404 if the load
+                                               has no folder on the prey (fails OPEN if the share is unreachable).
+                                               NO list (George 2026-10-02): list_id optional, omit it; new notes = null.
   GET    /notes/api/notes?list_id&q&load_no&since&before_id&limit   newest first, max 200/page
   GET    /notes/api/notes/:id                  one note
   PUT    /notes/api/notes/:id                  {body?, list_id?, expect_updated_at?}  409 if stale
@@ -42,8 +44,8 @@ Save path: browser -> oakley edge -> Reggi :3005 -> one transaction (notes row +
 NOTHING is written to the loads folder or the DBFs. NO BACKUP YET (Monkey D: not in nightly).
 NOT per-load: the writer must be local to the file and Reggi runs on Monkey.
 
-  lists       (dataset, list_id) PK — list_id = legacy LISTNO
-  notes       id AUTOINCREMENT, dataset, load_no, list_id, item_no, id_no, body, deleted,
+  lists       (dataset, list_id) PK — list_id = legacy LISTNO. LEGACY ONLY: new notes have no list.
+  notes       id AUTOINCREMENT, dataset, load_no, list_id (NULLable since 2026-10-02), item_no, id_no, body, deleted,
               source (app|import), client_key, legacy_listno, legacy_idx, created_/updated_ by/at
   note_events note_id, ts, actor, kind, body — full history
 
@@ -51,6 +53,8 @@ Legacy: LISTHEAD->lists; LISTTAIL+LISTNOTE->notes; NEXTIDX->AUTOINCREMENT.
 NOTE1..10 join: a field filled to 250 runs on into the next; a short field ends a line.
 Import is keyed on (legacy_listno, legacy_idx); never overwrites a note edited in the app.
 IMPORTED 2026-10-01 (as import:george): WILLIS 4220 notes, WILLDEV 3154. Other datasets: not yet.
+notes.jsn per load (loads/<d>/<load>/notes.jsn) written on every change + .sem; backfilled for all
+imported loads 2026-10-02. salem search reads it; palmbeach i_ldld splices it into all.jsn as NOTES.
 List colours stored in lists.color: 1003 TAGPROB #d32f2f, 1005 2020 #1976d2 (WILLIS, WILLDEV).
 
 LEGACY FACTS (willis, measured 2026-10-01): central dbf\\LISTNOTE.DBF = 10.6 MB holding
@@ -59,15 +63,16 @@ LEGACY FACTS (willis, measured 2026-10-01): central dbf\\LISTNOTE.DBF = 10.6 MB 
 loads\\<d>\\<lot>\\list*.dbf are i_augload copies.`],
   '--facet-notes-ui': ['(unverified) Load-screen notes strip — what the user sees, where the code lives', `
 LIVE on willis (and the willdev tip ring: putnal, ics) since 2026-10-01: willdev 0c5ba0f3,
-true1.html trues.js?v=20261001n. Source of truth: c:/clients/nottingham/ui/notes-strip.js, pasted
+true1.html trues.js?v=20261002a. Source of truth: c:/clients/nottingham/ui/notes-strip.js, pasted
 into willdev/javascripts/trues.js as the block '// --- Load notes: chips + Add / Edit' ...
 '// --- end load notes' (it replaced the old chip block). trues.js is eustis's file; this block is mine.
 
 WHAT THE USER SEES (#theListDiv, under the load header):
   chips    '4 notes  [TAGPROB testing add two] [2020 test add] ...'  colour = lists.color
   click    a chip opens inline: full text, 'who, date', and an Edit button
-  + Note   (header button in salesgrid.js -> createListNote()) opens a MODAL: list dropdown +
-           textarea, Save / Cancel, Ctrl+Enter / Esc. Backdrop click does NOT close (no lost typing).
+  + Note   (header button in salesgrid.js -> createListNote()) opens a MODAL: textarea only (no list
+           picker, George 2026-10-02), Save / Cancel, Ctrl+Enter / Esc. Backdrop click does NOT close.
+  chips    legacy notes show their list label; new notes show just the text (grey dot).
   Edit     same modal, prefilled. Stale edit -> 'Changed by X ... Save again to replace it'.
   createnote.prg / listnote.prg popups are RETIRED from this screen (George 2026-10-01).
 
