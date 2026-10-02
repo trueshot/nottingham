@@ -103,7 +103,7 @@ function ntgLoadNo() {
 function ntgFetch() {
    var load = ntgLoadNo()
    var lists = _app.ntg && _app.ntg.lists
-   _app.ntg = { load: load, live: false, ready: false, notes: [], lists: lists }
+   _app.ntg = { load: load, live: false, ready: false, notes: [], lists: lists, src: _app.theCurrentNoteList }
    _app.notesOpen = {}
    if (!load) return
    Promise.all([
@@ -116,6 +116,7 @@ function ntgFetch() {
          _app.ntg.lists = r[1].lists || []
          _app.ntg.live = true
          _app.ntg.ready = true
+         _app.ntg.at = Date.now()
          renderNoteList()
       })
       .catch(function (e) {
@@ -130,6 +131,7 @@ function ntgRefresh() {
    return ntgApi('GET', '/loads/' + encodeURIComponent(load) + '/notes').then(function (r) {
       if (_app.ntg && _app.ntg.load === load) {
          _app.ntg.notes = r.notes || []
+         _app.ntg.at = Date.now()
          renderNoteList()
       }
    })
@@ -327,6 +329,11 @@ function renderNoteList() {
    var div = document.getElementById('theListDiv')
    if (!div) return
    if (!_app.ntg || _app.ntg.load !== ntgLoadNo()) ntgFetch()
+   else if (_app.ntg.ready && (_app.ntg.src !== _app.theCurrentNoteList || Date.now() - (_app.ntg.at || 0) > 10000)) {
+      // Same load re-retrieved (Refresh) or data older than 10s: fetch notes again, quietly.
+      _app.ntg.src = _app.theCurrentNoteList
+      ntgQuietRefresh()
+   }
    ntgEnsureNotesCss()
    var notes = ntgNotesData()
    if (!notes.length) {
