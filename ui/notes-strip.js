@@ -44,7 +44,7 @@ function ntgEnsureNotesCss() {
       '.ntgn-btn.ntgn-primary{background:#1a73e8;border-color:#1a73e8;color:#fff;}' +
       '.ntgn-btn.ntgn-primary:hover{background:#1765cc;}' +
       '.ntgn-btn[disabled]{opacity:.55;cursor:default;}' +
-      '.ntgn-ph .ntgn-btn{margin-left:auto;padding:1px 10px;font-size:11px;letter-spacing:0;text-transform:none;}' +
+      '.ntgn-ph .ntgn-btn{margin-left:4px;padding:1px 10px;font-size:11px;letter-spacing:0;text-transform:none;}' +
       '.ntgn-overlay{position:fixed;inset:0;z-index:100000;background:rgba(32,33,36,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;}' +
       '.ntgn-dialog{width:520px;max-width:calc(100vw - 32px);box-sizing:border-box;background:#fff;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.28);padding:16px 20px 14px;font-family:Roboto,Arial,sans-serif;color:#202124;}' +
       '.ntgn-dhead{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}' +
