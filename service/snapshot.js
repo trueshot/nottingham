@@ -44,7 +44,7 @@ function migrate(d) {
       last_error TEXT NOT NULL DEFAULT '',
       PRIMARY KEY (dataset, load_no)
     );
-    CREATE INDEX IF NOT EXISTS idx_snapq_next ON snapshot_queue (next_at);
+    CREATE INDEX IF NOT EXISTS idx_snapq_prio ON snapshot_queue (sem, next_at);
   `);
 }
 
@@ -115,7 +115,7 @@ async function tick() {
   busy = true;
   try {
     const now = new Date().toISOString();
-    const rows = db.prepare(`SELECT * FROM snapshot_queue WHERE next_at <= ? ORDER BY next_at LIMIT ?`).all(now, PER_TICK);
+    const rows = db.prepare(`SELECT * FROM snapshot_queue WHERE next_at <= ? ORDER BY sem DESC, next_at LIMIT ?   -- real saves (sem=1) before backfill`).all(now, PER_TICK);
     for (const row of rows) {
       try {
         await writeOne(row);
