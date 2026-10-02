@@ -134,6 +134,24 @@ function ntgRefresh() {
       }
    })
 }
+// Notes can be added from elsewhere on the page (prospect's Flow bar) or by another
+// user. Redraw when told ('notes:changed' event, detail = {load}), when the window
+// regains focus, and once a minute while visible. Quiet: failures are ignored.
+function ntgQuietRefresh() {
+   if (!(_app.ntg && _app.ntg.live && _app.ntg.load === ntgLoadNo()) || _app.ntgEdit) return
+   ntgRefresh().catch(function () {})
+}
+if (!window.__ntgHooked) {
+   window.__ntgHooked = true
+   document.addEventListener('notes:changed', function (e) {
+      var load = e && e.detail && e.detail.load
+      if (!load || String(load).trim() === ntgLoadNo()) ntgQuietRefresh()
+   })
+   window.addEventListener('focus', ntgQuietRefresh)
+   setInterval(function () {
+      if (document.visibilityState === 'visible') ntgQuietRefresh()
+   }, 60000)
+}
 function ntgAccent(listId) {
    var lists = (_app.ntg && _app.ntg.lists) || []
    for (var i = 0; i < lists.length; i++) {
