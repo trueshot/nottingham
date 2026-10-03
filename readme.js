@@ -63,13 +63,15 @@ LEGACY FACTS (willis, measured 2026-10-01): central dbf\\LISTNOTE.DBF = 10.6 MB 
 loads\\<d>\\<lot>\\list*.dbf are i_augload copies.`],
   '--facet-notes-ui': ['(unverified) Load-screen notes strip — what the user sees, where the code lives', `
 LIVE on willis (and the willdev tip ring: putnal, ics) since 2026-10-01: willdev 0c5ba0f3,
-true1.html trues.js?v=20261002f. Source of truth: c:/clients/nottingham/ui/notes-strip.js, pasted
+true1.html trues.js?v=20261003a. Source of truth: c:/clients/nottingham/ui/notes-strip.js, pasted
 into willdev/javascripts/trues.js as the block '// --- Load notes: chips + Add / Edit' ...
 '// --- end load notes' (it replaced the old chip block). trues.js is eustis's file; this block is mine.
 
 WHAT THE USER SEES (#theListDiv, under the load header):
-  chips    '4 notes  [TAGPROB testing add two] [2020 test add] ...'  colour = lists.color
-  click    a chip opens inline: full text, 'who, date', and an Edit button
+  board    POST-IT NOTES (2026-10-03): yellow cards with tape, tilt, folded corner; 'N notes' toggle hides/shows
+           the board (remembered: localStorage notesCollapsed); '+ Add note' card at the end.
+           Preview: c:/clients/nottingham/library/postit-preview.png
+  click    a post-it opens the Edit modal (post-it styled); hover lifts it and shows a pencil
   + Note   (header button in salesgrid.js -> createListNote()) opens a MODAL: textarea only (no list
            picker, George 2026-10-02), Save / Cancel, Ctrl+Enter / Esc. Backdrop click does NOT close.
   chips    legacy notes show their list label; new notes show just the text (grey dot).

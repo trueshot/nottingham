@@ -25,20 +25,33 @@ function ntgEnsureNotesCss() {
    var s = document.createElement('style')
    s.id = 'ntgn-css'
    s.textContent =
-      '.ntgn-wrap{font-family:Roboto,Arial,sans-serif;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:4px 0;}' +
-      '.ntgn-sum{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#5f6368;cursor:pointer;background:none;border:none;padding:2px 6px;border-radius:4px;}' +
+      // --- post-it board ---
+      '.ntgn-board{font-family:Roboto,Arial,sans-serif;padding:4px 2px 10px;}' +
+      '.ntgn-sum{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:#5f6368;cursor:pointer;background:none;border:none;padding:2px 6px;margin:0 0 4px -6px;border-radius:4px;}' +
       '.ntgn-sum:hover{background:#eef1f5;}' +
       '.ntgn-caret{font-size:9px;color:#80868b;}' +
-      '.ntgn-chip{display:inline-flex;align-items:center;gap:6px;max-width:300px;padding:3px 11px 3px 9px;border-radius:14px;background:#f1f3f4;border:1px solid #e3e6e9;font-size:12px;color:#3c4043;cursor:pointer;line-height:18px;transition:background .12s,box-shadow .12s;}' +
-      '.ntgn-chip:hover{background:#e8eaed;box-shadow:0 1px 3px rgba(0,0,0,.14);}' +
-      '.ntgn-chip.ntgn-on{background:#e8f0fe;border-color:#c5d8fb;}' +
-      '.ntgn-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}' +
-      '.ntgn-tag{font-weight:600;}' +
-      '.ntgn-snip{color:#5f6368;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;}' +
-      '.ntgn-panel{flex:1 1 100%;box-sizing:border-box;background:#fff;border:1px solid #e3e6e9;border-left:3px solid #1976d2;border-radius:6px;padding:8px 12px;margin:1px 0 3px;font-size:13px;color:#202124;white-space:pre-wrap;line-height:1.45;box-shadow:0 1px 2px rgba(0,0,0,.06);}' +
-      '.ntgn-ph{display:flex;align-items:center;gap:8px;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:3px;white-space:normal;}' +
-      '.ntgn-meta{font-weight:400;letter-spacing:0;text-transform:none;color:#80868b;}' +
-      '.ntgn-empty{font-size:12px;color:#9aa0a6;font-style:italic;}' +
+      '.ntgn-row{display:flex;flex-wrap:wrap;align-items:flex-start;gap:14px 14px;}' +
+      '.ntgn-pi{position:relative;box-sizing:border-box;width:200px;min-height:104px;padding:16px 12px 14px;background:#fff7b0;' +
+      'color:#3d3a1c;font-size:13px;line-height:1.4;cursor:pointer;border-radius:1px 1px 2px 2px;' +
+      'box-shadow:0 1px 1px rgba(60,50,0,.10),0 6px 10px -4px rgba(60,50,0,.28);transform:rotate(var(--ntg-r,0deg));' +
+      'transition:transform .15s ease,box-shadow .15s ease;' +
+      'background-image:linear-gradient(135deg,transparent 0,transparent calc(100% - 16px),rgba(0,0,0,.07) calc(100% - 16px),#f2e58a calc(100% - 15px),#fff7b0 100%);}' +
+      '.ntgn-pi:hover{transform:rotate(0deg) translateY(-3px);box-shadow:0 2px 2px rgba(60,50,0,.10),0 12px 18px -6px rgba(60,50,0,.32);z-index:2;}' +
+      '.ntgn-pi.ntgn-ro{cursor:default;}' +
+      '.ntgn-pi.ntgn-ro:hover{transform:rotate(var(--ntg-r,0deg));}' +
+      '.ntgn-tape{position:absolute;top:-7px;left:50%;width:58px;height:16px;margin-left:-29px;background:rgba(255,255,255,.55);' +
+      'box-shadow:0 1px 2px rgba(0,0,0,.10);transform:rotate(-2deg);}' +
+      '.ntgn-pmeta{display:flex;align-items:center;gap:6px;font-size:11px;color:#8a8350;margin-bottom:5px;white-space:nowrap;}' +
+      '.ntgn-pmeta > span:not(.ntgn-plab):not(.ntgn-pedit){overflow:hidden;text-overflow:ellipsis;min-width:0;}' +
+      '.ntgn-plab{flex:0 0 auto;font-weight:700;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:0 5px;border-radius:3px;color:#fff;}' +
+      '.ntgn-pedit{margin-left:auto;font-size:13px;color:#8a8350;opacity:0;transition:opacity .15s;}' +
+      '.ntgn-pi:hover .ntgn-pedit{opacity:1;}' +
+      '.ntgn-pbody{white-space:pre-wrap;word-break:break-word;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:5;overflow:hidden;}' +
+      '.ntgn-pbody.ntgn-full{display:block;}' +
+      '.ntgn-empty{color:#a39d6a;font-style:italic;}' +
+      '.ntgn-padd{display:flex;align-items:center;justify-content:center;width:130px;min-height:104px;box-sizing:border-box;border:2px dashed #e0d58a;' +
+      'border-radius:2px;color:#a39d6a;font:600 13px Roboto,Arial,sans-serif;background:rgba(255,247,176,.25);cursor:pointer;}' +
+      '.ntgn-padd:hover{background:rgba(255,247,176,.6);color:#6b6430;}' +
       '.ntgn-btn{font:600 12px Roboto,Arial,sans-serif;padding:3px 12px;border-radius:4px;border:1px solid #dadce0;background:#fff;color:#1a73e8;cursor:pointer;}' +
       '.ntgn-btn:hover{background:#f1f6fe;}' +
       '.ntgn-btn.ntgn-primary{background:#1a73e8;border-color:#1a73e8;color:#fff;}' +
@@ -46,7 +59,7 @@ function ntgEnsureNotesCss() {
       '.ntgn-btn[disabled]{opacity:.55;cursor:default;}' +
       '.ntgn-ph .ntgn-btn{margin-left:4px;padding:1px 10px;font-size:11px;letter-spacing:0;text-transform:none;}' +
       '.ntgn-overlay{position:fixed;inset:0;z-index:100000;background:rgba(32,33,36,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;}' +
-      '.ntgn-dialog{width:520px;max-width:calc(100vw - 32px);box-sizing:border-box;background:#fff;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.28);padding:16px 20px 14px;font-family:Roboto,Arial,sans-serif;color:#202124;}' +
+      '.ntgn-dialog{width:520px;max-width:calc(100vw - 32px);box-sizing:border-box;background:#fffbd6;border-radius:4px;border-top:6px solid #f2e58a;box-shadow:0 12px 32px rgba(0,0,0,.28);padding:16px 20px 14px;font-family:Roboto,Arial,sans-serif;color:#202124;}' +
       '.ntgn-dhead{display:flex;align-items:baseline;gap:10px;margin-bottom:12px;}' +
       '#ntgn-title{font-size:16px;font-weight:600;}' +
       '.ntgn-dload{font-size:12px;color:#5f6368;}' +
@@ -54,7 +67,7 @@ function ntgEnsureNotesCss() {
       '.ntgn-x:hover{color:#202124;}' +
       '.ntgn-lbl{display:block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5f6368;margin:8px 0 4px;}' +
       '.ntgn-dialog select{width:100%;box-sizing:border-box;font:14px Roboto,Arial,sans-serif;padding:6px 8px;border:1px solid #dadce0;border-radius:4px;background:#fff;}' +
-      '.ntgn-dialog textarea{display:block;width:100%;box-sizing:border-box;min-height:140px;padding:8px 10px;font:14px/1.45 Roboto,Arial,sans-serif;border:1px solid #dadce0;border-radius:4px;resize:vertical;}' +
+      '.ntgn-dialog textarea{display:block;width:100%;box-sizing:border-box;min-height:160px;padding:10px 12px;font:14px/1.5 Roboto,Arial,sans-serif;color:#3d3a1c;background:#fff7b0;border:1px solid #eadf8f;border-radius:2px;resize:vertical;}' +
       '.ntgn-dialog textarea:focus,.ntgn-dialog select:focus{outline:2px solid #c5d8fb;border-color:#1a73e8;}' +
       '.ntgn-dfoot{display:flex;align-items:center;gap:8px;margin-top:12px;}' +
       '.ntgn-hint{font-size:11px;color:#9aa0a6;}' +
@@ -63,16 +76,6 @@ function ntgEnsureNotesCss() {
       '.ntgn-del.ntgn-armed{background:#c5221f;border-color:#c5221f;color:#fff;}' +
       '.ntgn-err{color:#c5221f;font-size:12px;margin-right:auto;}'
    document.head.appendChild(s)
-}
-function getNotesDisplayMode() {
-   if (!_app.notesDisplayMode) {
-      var saved = null
-      try {
-         saved = localStorage.getItem('notesDisplayMode')
-      } catch (e) {}
-      _app.notesDisplayMode = saved === 'expanded' ? 'expanded' : 'compact'
-   }
-   return _app.notesDisplayMode
 }
 function ntgApi(method, path, body) {
    return fetch(NTG_API + path, {
@@ -115,7 +118,7 @@ function ntgFetch() {
    var load = ntgLoadNo()
    var src = ntgLoadedNotes()
    _app.ntg = { load: load, src: src, live: false, ready: false, notes: [] }
-   _app.notesOpen = {}
+
    if (!load) return
    if (src) {
       // Normal path: the notes came with the load — no extra request.
@@ -209,16 +212,22 @@ function ntgNotesData() {
       }
    })
 }
-function ntgToggleAll() {
-   _app.notesDisplayMode = getNotesDisplayMode() === 'expanded' ? 'compact' : 'expanded'
-   try {
-      localStorage.setItem('notesDisplayMode', _app.notesDisplayMode)
-   } catch (e) {}
-   renderNoteList()
+// Show / hide the post-it row; remembered per browser.
+function ntgCollapsed() {
+   if (_app.notesCollapsed === undefined) {
+      var saved = null
+      try {
+         saved = localStorage.getItem('notesCollapsed')
+      } catch (e) {}
+      _app.notesCollapsed = saved === '1'
+   }
+   return _app.notesCollapsed
 }
-function ntgToggleNote(i) {
-   _app.notesOpen = _app.notesOpen || {}
-   _app.notesOpen[i] = !_app.notesOpen[i]
+function ntgToggleAll() {
+   _app.notesCollapsed = !ntgCollapsed()
+   try {
+      localStorage.setItem('notesCollapsed', _app.notesCollapsed ? '1' : '0')
+   } catch (e) {}
    renderNoteList()
 }
 // --- modal editor: Add (+ Note) and Edit share it ---
@@ -307,7 +316,7 @@ function ntgDelete() {
       .then(function () {
          ed.saving = false
          ntgModalClose()
-         _app.notesOpen = {}
+
          if (ed.load === ntgLoadNo()) return ntgRefresh()
       })
       .catch(function (e) {
@@ -334,14 +343,15 @@ function ntgSave() {
    p.then(function (r) {
       ed.saving = false
       ntgModalClose()
-      var savedId = r.note && r.note.id
       if (ed.load !== ntgLoadNo()) return
-      return ntgRefresh().then(function () {
-         // open the saved note so the user sees what was stored
-         var notes = ntgNotesData()
-         for (var i = 0; i < notes.length; i++) if (notes[i].id === savedId) _app.notesOpen[i] = true
-         renderNoteList()
-      })
+      // a new note on a hidden board: show the board so the user sees it land
+      if (_app.notesCollapsed) {
+         _app.notesCollapsed = false
+         try {
+            localStorage.setItem('notesCollapsed', '0')
+         } catch (e) {}
+      }
+      return ntgRefresh()
    }).catch(function (e) {
       ed.saving = false
       ntgModalBusy(false)
@@ -361,7 +371,7 @@ function ntgSave() {
 function ntgWhen(iso) {
    if (!iso) return ''
    var d = new Date(iso)
-   return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate() + '/' + d.getFullYear()
+   return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate() + '/' + String(d.getFullYear()).slice(2)
 }
 function renderNoteList() {
    var div = document.getElementById('theListDiv')
@@ -374,40 +384,40 @@ function renderNoteList() {
       div.innerHTML = ''
       return
    }
-   var allOpen = getNotesDisplayMode() === 'expanded'
-   _app.notesOpen = _app.notesOpen || {}
-   var caret = allOpen ? '&#9662;' : '&#9656;'
-   var h = ['<span class="ntgn-wrap">']
-   if (notes.length) {
-      h.push(
-         '<button type="button" class="ntgn-sum" title="' + (allOpen ? 'Collapse all' : 'Expand all') +
-            '" onclick="ntgToggleAll()"><span class="ntgn-caret">' + caret + '</span>' +
-            notes.length + ' note' + (notes.length === 1 ? '' : 's') + '</button>',
-      )
-   }
-   notes.forEach(function (x, i) {
-      var on = allOpen || _app.notesOpen[i]
-      var plain = x.full ? x.full.replace(/\s+/g, ' ').trim() : ''
-      var snipHtml = ntgEsc(plain.slice(0, 24)) + (plain.length > 24 ? '&#8230;' : '')
-      h.push(
-         '<span class="ntgn-chip' + (on ? ' ntgn-on' : '') + '" onclick="ntgToggleNote(' + i + ')" title="' +
-            ntgEsc((x.short ? x.short + ': ' : '') + plain) + '"><span class="ntgn-dot" style="background:' + x.accent + '"></span>' +
-            // legacy notes keep their list label; new notes have none (George 2026-10-02) -> text only
-            (x.short ? '<span class="ntgn-tag" style="color:' + x.accent + '">' + ntgEsc(x.short) + '</span>' : '') +
-            (on && x.short ? '' : '<span class="ntgn-snip">' + snipHtml + '</span>') + '</span>',
-      )
-      if (on) {
-         var meta = x.updated_by ? x.updated_by.replace(/^import:.*/, 'imported') + (x.updated_at ? ', ' + ntgWhen(x.updated_at) : '') : ''
+   var collapsed = ntgCollapsed()
+   var editable = !!(_app.ntg && _app.ntg.live)
+   var h = ['<div class="ntgn-board">']
+   h.push(
+      '<button type="button" class="ntgn-sum" title="' + (collapsed ? 'Show notes' : 'Hide notes') +
+         '" onclick="ntgToggleAll()"><span class="ntgn-caret">' + (collapsed ? '&#9656;' : '&#9662;') + '</span>' +
+         notes.length + ' note' + (notes.length === 1 ? '' : 's') + '</button>',
+   )
+   if (!collapsed) {
+      h.push('<div class="ntgn-row">')
+      notes.forEach(function (x) {
+         // a slight, stable tilt per note (same note, same angle every render)
+         var tilt = ((((x.id || x.full.length) * 37) % 7) - 3) * 0.45
+         var who = x.updated_by ? x.updated_by.replace(/^import:.*/, 'imported') : ''
+         var meta = who + (x.updated_at ? (who ? ' · ' : '') + ntgWhen(x.updated_at) : '')
+         var canEdit = editable && x.id != null
          h.push(
-            '<span class="ntgn-panel" style="border-left-color:' + x.accent + '"><span class="ntgn-ph" style="color:' +
-               x.accent + '">' + (x.short ? ntgEsc(x.short) + (x.name && x.name !== x.short ? ' &mdash; ' + ntgEsc(x.name) : '') : 'Note') +
-               (meta ? '<span class="ntgn-meta">' + ntgEsc(meta) + '</span>' : '') +
-               (x.id != null ? '<button type="button" class="ntgn-btn" onclick="event.stopPropagation();ntgEdit(' + x.id + ')">Edit</button>' : '') +
-               '</span>' + (x.full ? ntgEsc(x.full) : '<span class="ntgn-empty">(no text)</span>') + '</span>',
+            '<div class="ntgn-pi' + (canEdit ? '' : ' ntgn-ro') + '" style="--ntg-r:' + tilt.toFixed(2) + 'deg"' +
+               (canEdit ? ' onclick="ntgEdit(' + x.id + ')" title="Click to edit"' : '') + '>' +
+               '<span class="ntgn-tape"></span>' +
+               '<div class="ntgn-pmeta">' +
+               // legacy notes keep their list label; new notes have none (George 2026-10-02)
+               (x.short ? '<span class="ntgn-plab" style="background:' + x.accent + '">' + ntgEsc(x.short) + '</span>' : '') +
+               '<span>' + ntgEsc(meta) + '</span>' +
+               (canEdit ? '<span class="ntgn-pedit">&#9998;</span>' : '') +
+               '</div>' +
+               '<div class="ntgn-pbody">' + (x.full ? ntgEsc(x.full) : '<span class="ntgn-empty">(no text)</span>') + '</div>' +
+               '</div>',
          )
-      }
-   })
-   h.push('</span>')
+      })
+      if (editable) h.push('<div class="ntgn-padd" onclick="createListNote()" title="Add a note">+ Add note</div>')
+      h.push('</div>')
+   }
+   h.push('</div>')
    div.innerHTML = h.join('')
 }
 // "+ Note" in the load header (salesgrid.js) and the Edit button call these.
